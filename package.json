@@ -1,0 +1,16 @@
+{
+  "name": "medilink",
+  "version": "1.0.0",
+  "description": "Ambulance to Doctor real-time patient data system",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  }
+}

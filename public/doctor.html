@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MediLink — Doctor</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+:root{--red:#E24B4A;--red-dark:#A32D2D;--red-glow:rgba(226,75,74,0.15);--amber:#EF9F27;--green:#1D9E75;--blue:#378ADD;--blue-glow:rgba(55,138,221,0.12);--bg:#0D0D0F;--bg2:#131317;--bg3:#1A1A20;--bg4:#222228;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#F0EFE8;--text2:#8A8A94;--text3:#55555E;--mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+header{background:var(--bg2);border-bottom:1px solid var(--border2);padding:0 2rem;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-icon{width:32px;height:32px;background:var(--blue);border-radius:6px;display:flex;align-items:center;justify-content:center;}
+.logo-icon svg{width:18px;height:18px;fill:white;}
+.logo-text{font-family:var(--mono);font-size:15px;font-weight:600;}
+.logo-text span{color:var(--blue);}
+.role-badge{font-family:var(--mono);font-size:12px;background:var(--blue-glow);border:1px solid rgba(55,138,221,0.4);color:var(--blue);padding:4px 12px;border-radius:4px;}
+.sound-toggle{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text2);cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:0.06em;padding:6px 10px;text-transform:uppercase;transition:all 0.15s;}
+.sound-toggle:hover{color:var(--text);background:var(--bg4);}
+.sound-toggle.ready{background:rgba(29,158,117,0.1);border-color:rgba(29,158,117,0.45);color:var(--green);}
+.sound-toggle.warn{background:rgba(239,159,39,0.1);border-color:rgba(239,159,39,0.45);color:var(--amber);}
+#clock{font-family:var(--mono);font-size:13px;color:var(--text2);}
+.amb-stat{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;}
+.amb-dot{width:6px;height:6px;border-radius:50%;background:var(--text3);}
+.amb-dot.live{background:var(--red);animation:pdot 1s ease-in-out infinite;}
+@keyframes pdot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.7)}}
+main{max-width:1200px;margin:0 auto;padding:2rem;display:grid;gap:1.5rem;}
+.slabel{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.slabel::after{content:'';flex:1;height:1px;background:var(--border);}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1.5rem;}
+#waiting{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:24px;text-align:center;}
+.wpulse{width:72px;height:72px;border-radius:50%;border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;animation:wring 2s ease-in-out infinite;}
+@keyframes wring{0%,100%{box-shadow:0 0 0 0 rgba(55,138,221,0.3)}50%{box-shadow:0 0 0 16px rgba(55,138,221,0)}}
+.wpulse svg{width:28px;height:28px;stroke:var(--blue);fill:none;}
+#dash{display:none;}
+.alert-banner{border-radius:10px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;}
+.alert-banner.critical{background:var(--red-glow);border:1px solid rgba(226,75,74,0.4);}
+.alert-banner.moderate{background:rgba(239,159,39,0.1);border:1px solid rgba(239,159,39,0.35);}
+.alert-banner.stable{background:rgba(29,158,117,0.1);border:1px solid rgba(29,158,117,0.3);}
+.al-left{display:flex;align-items:center;gap:14px;}
+.sev-badge{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;padding:5px 12px;border-radius:4px;}
+.sev-badge.critical{background:var(--red);color:white;}
+.sev-badge.moderate{background:var(--amber);color:#1a0d00;}
+.sev-badge.stable{background:var(--green);color:white;}
+.al-title{font-size:16px;font-weight:600;}
+.al-sub{font-size:12px;color:var(--text2);font-family:var(--mono);}
+.al-time{font-family:var(--mono);font-size:12px;color:var(--text2);}
+.top-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.5rem;}
+.info-tbl{width:100%;border-collapse:collapse;}
+.info-tbl tr td{padding:7px 0;vertical-align:top;}
+.info-tbl tr td:first-child{color:var(--text3);font-size:11px;text-transform:uppercase;letter-spacing:0.07em;width:100px;padding-right:12px;}
+.info-tbl tr td:last-child{font-size:14px;font-weight:500;}
+.info-tbl tr+tr td{border-top:1px solid var(--border);}
+.eta-big{text-align:center;padding:8px 0;}
+.eta-num{font-family:var(--mono);font-size:52px;font-weight:600;line-height:1;}
+.eta-num.urgent{color:var(--red);}
+.eta-num.soon{color:var(--amber);}
+.eta-unit{font-size:12px;color:var(--text2);letter-spacing:0.08em;text-transform:uppercase;margin-top:4px;}
+.eta-bar-wrap{background:var(--bg3);border-radius:4px;height:4px;margin:14px 0 10px;overflow:hidden;}
+.eta-bar{height:100%;border-radius:4px;background:var(--green);transition:width 1s linear,background 0.5s;}
+.eta-mr{display:flex;justify-content:space-between;font-size:11px;color:var(--text3);font-family:var(--mono);}
+.eta-loc{font-size:11px;color:var(--text3);text-align:center;margin-top:6px;line-height:1.4;}
+.vgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.vt{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 14px;position:relative;overflow:hidden;}
+.vt::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--border);}
+.vt.ok::before{background:var(--green);}
+.vt.warn::before{background:var(--amber);}
+.vt.bad::before{background:var(--red);}
+.vt.bad{animation:tflash 2s ease-in-out infinite;}
+@keyframes tflash{0%,100%{border-color:var(--border)}50%{border-color:rgba(226,74,74,0.4)}}
+.vt-lbl{font-size:10px;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;font-weight:600;margin-bottom:6px;}
+.vt-val{font-family:var(--mono);font-size:22px;font-weight:600;}
+.vt-unit{font-family:var(--mono);font-size:11px;color:var(--text3);margin-left:3px;}
+.vt-st{font-size:10px;margin-top:4px;font-weight:600;letter-spacing:0.06em;}
+.vt-st.ok{color:var(--green);}
+.vt-st.warn{color:var(--amber);}
+.vt-st.bad{color:var(--red);}
+.bp-tile{grid-column:span 2;}
+.notes-row{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;}
+.nbox{background:var(--bg3);border-radius:6px;padding:12px 14px;font-size:13px;color:var(--text2);line-height:1.7;min-height:70px;border:1px solid var(--border);}
+.nbox.empty{color:var(--text3);font-style:italic;}
+#doc-map{height:260px;border-radius:8px;overflow:hidden;border:1px solid var(--border);}
+.leaflet-tile{filter:brightness(0.75) saturate(0.5) hue-rotate(185deg) invert(1);}
+.leaflet-container{background:#1a1a20;}
+textarea.dnotes{background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--sans);font-size:14px;padding:10px 14px;outline:none;resize:vertical;min-height:90px;line-height:1.6;width:100%;}
+textarea.dnotes:focus{border-color:rgba(55,138,221,0.5);background:var(--bg4);}
+textarea.dnotes::placeholder{color:var(--text3);}
+.act-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;}
+.act-btn{padding:10px 18px;border-radius:6px;font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:0.06em;cursor:pointer;text-transform:uppercase;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);transition:all 0.15s;}
+.act-btn:hover{color:var(--text);background:var(--bg4);}
+.act-btn.primary{background:var(--blue);border-color:var(--blue);color:white;flex:1;}
+.act-btn.danger{background:var(--red-glow);border-color:var(--red-dark);color:var(--red);}
+.ustrip{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text3);font-family:var(--mono);}
+.ulive{display:flex;align-items:center;gap:6px;color:var(--green);}
+.ldot{width:6px;height:6px;background:var(--green);border-radius:50%;animation:pdot 1.4s infinite;}
+@media(max-width:900px){.top-row,.notes-row{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-icon"><svg viewBox="0 0 24 24"><path d="M19 11h-6V5h-2v6H5v2h6v6h2v-6h6z"/></svg></div>
+    <span class="logo-text">Medi<span>Link</span></span>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px;">
+    <div class="role-badge">DR. DASHBOARD</div>
+    <button class="sound-toggle" id="sound-btn" onclick="enableAlertSound()" title="Enable sound alerts">Sound off</button>
+    <div class="amb-stat"><div class="amb-dot" id="amb-dot"></div><span id="amb-lbl" style="color:var(--text3);">Awaiting ambulance</span></div>
+  </div>
+  <div id="clock">--:--:--</div>
+</header>
+<main>
+  <div id="waiting">
+    <div class="wpulse"><svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+    <div>
+      <div style="font-size:18px;font-weight:500;color:var(--text2);">Waiting for patient data</div>
+      <div style="font-size:13px;color:var(--text3);font-family:var(--mono);margin-top:8px;">Open the nurse page from this same website URL &amp; hit Transmit</div>
+    </div>
+    <div style="font-size:12px;color:var(--text3);font-family:var(--mono);background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px 18px;line-height:1.8;">
+      &#9432; Works across browsers/devices when using the same hosted URL
+    </div>
+  </div>
+  <div id="dash">
+    <div class="alert-banner" id="alert-banner">
+      <div class="al-left"><div class="sev-badge" id="sev-badge">-</div><div><div class="al-title" id="al-title">Patient incoming</div><div class="al-sub" id="al-sub">AMB-04</div></div></div>
+      <div class="al-time" id="al-time">Received -</div>
+    </div>
+    <div class="top-row">
+      <div class="card">
+        <div class="slabel">Patient</div>
+        <table class="info-tbl">
+          <tr><td>Name</td><td id="d-name">-</td></tr>
+          <tr><td>Age / Gender</td><td id="d-age">-</td></tr>
+          <tr><td>Blood</td><td id="d-blood">-</td></tr>
+          <tr><td>Incident</td><td id="d-incident">-</td></tr>
+          <tr><td>Allergies</td><td id="d-allergy" style="color:var(--red)">-</td></tr>
+          <tr><td>Unit</td><td id="d-unit" style="font-family:var(--mono);font-size:12px">-</td></tr>
+        </table>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;justify-content:center;">
+        <div class="slabel">ETA</div>
+        <div class="eta-big"><div class="eta-num" id="eta-num">--</div><div class="eta-unit">minutes remaining</div></div>
+        <div class="eta-bar-wrap"><div class="eta-bar" id="eta-bar" style="width:100%"></div></div>
+        <div class="eta-mr"><span id="eta-orig">-</span><span id="eta-dist">-</span></div>
+        <div class="eta-loc" id="eta-loc">-</div>
+      </div>
+      <div class="card">
+        <div class="slabel">Vitals</div>
+        <div class="vgrid">
+          <div class="vt" id="vt-spo2"><div class="vt-lbl">SpO&#x2082;</div><div><span class="vt-val" id="v-spo2">--</span><span class="vt-unit">%</span></div><div class="vt-st" id="vs-spo2"></div></div>
+          <div class="vt" id="vt-hr"><div class="vt-lbl">Heart Rate</div><div><span class="vt-val" id="v-hr">--</span><span class="vt-unit">bpm</span></div><div class="vt-st" id="vs-hr"></div></div>
+          <div class="vt" id="vt-rr"><div class="vt-lbl">Resp. Rate</div><div><span class="vt-val" id="v-rr">--</span><span class="vt-unit">brpm</span></div><div class="vt-st" id="vs-rr"></div></div>
+          <div class="vt" id="vt-temp"><div class="vt-lbl">Temp</div><div><span class="vt-val" id="v-temp">--</span><span class="vt-unit">&#xB0;C</span></div><div class="vt-st" id="vs-temp"></div></div>
+          <div class="vt bp-tile" id="vt-bp"><div class="vt-lbl">Blood Pressure</div><div><span class="vt-val" id="v-bp">--/--</span><span class="vt-unit">mmHg</span></div><div class="vt-st" id="vs-bp"></div></div>
+          <div class="vt" id="vt-gcs"><div class="vt-lbl">GCS Score</div><div><span class="vt-val" id="v-gcs">--</span><span class="vt-unit">/15</span></div><div class="vt-st" id="vs-gcs"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="notes-row">
+      <div class="card"><div class="slabel">Chief Complaint</div><div class="nbox" id="d-complaint">-</div></div>
+      <div class="card"><div class="slabel">Interventions (in ambulance)</div><div class="nbox" id="d-interventions">-</div></div>
+    </div>
+    <div class="card"><div class="slabel">Live Route — Ambulance to Hospital</div><div id="doc-map"></div></div>
+    <div class="card">
+      <div class="slabel">Doctor Response</div>
+      <textarea class="dnotes" id="doc-notes" placeholder="Prep instructions, alert specialties, order resources..."></textarea>
+      <div class="act-row">
+        <button class="act-btn danger" onclick="triggerAlert()">&#9888; Critical Alert</button>
+        <button class="act-btn" onclick="saveNotes()">Save Notes</button>
+        <button class="act-btn primary" onclick="markReady(this)">&#10003; Mark Team Ready</button>
+      </div>
+    </div>
+    <div class="ustrip">
+      <div class="ulive"><div class="ldot"></div>Live server updates</div>
+      <div id="last-update">-</div>
+    </div>
+  </div>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+if(sessionStorage.getItem('medilink_role')!=='doctor') location.href='/login';
+setInterval(function(){var el=document.getElementById('clock');if(el)el.textContent=new Date().toLocaleTimeString('en-IN',{hour12:false});},1000);
+
+// Socket.io — real-time updates from nurse
+var socket=io();
+socket.on('connect',function(){
+  socket.emit('join','doctor');
+});
+socket.on('patient_update',function(d){
+  if(d) render(d);
+});
+socket.on('notes_saved',function(notes){
+  document.getElementById('doc-notes').value=notes||'';
+});
+socket.on('online_counts',function(c){
+  if(lastSent)return;
+  var lbl=document.getElementById('amb-lbl'),dot=document.getElementById('amb-dot');
+  if(!lbl||!dot)return;
+  if(c.nurses){
+    dot.className='amb-dot live';
+    lbl.textContent=c.nurses===1?'Ambulance connected':c.nurses+' ambulances connected';
+    lbl.style.color='var(--red)';
+  }else{
+    dot.className='amb-dot';
+    lbl.textContent='Awaiting ambulance';
+    lbl.style.color='var(--text3)';
+  }
+});
+socket.on('error_message',function(m){alert(m);});
+
+fetch('/api/state')
+  .then(function(r){return r.json();})
+  .then(function(s){
+    if(s.patient)render(s.patient);
+    if(typeof s.doctorNotes==='string')document.getElementById('doc-notes').value=s.doctorNotes;
+  })
+  .catch(function(){});
+
+var alertAudioCtx=null,soundEnabled=false;
+function setSoundBtn(state,label){
+  var btn=document.getElementById('sound-btn');
+  if(!btn)return;
+  btn.className='sound-toggle '+(state||'');
+  btn.textContent=label;
+}
+function enableAlertSound(){
+  var Ctx=window.AudioContext||window.webkitAudioContext;
+  if(!Ctx){setSoundBtn('warn','No audio');return Promise.resolve(false);}
+  if(!alertAudioCtx)alertAudioCtx=new Ctx();
+  return alertAudioCtx.resume().then(function(){
+    soundEnabled=true;
+    setSoundBtn('ready','Sound on');
+    playAlertSound('ready');
+    return true;
+  }).catch(function(){setSoundBtn('warn','Click sound');return false;});
+}
+function playTone(freq,delay,dur,gain){
+  if(!soundEnabled||!alertAudioCtx)return;
+  var osc=alertAudioCtx.createOscillator(),vol=alertAudioCtx.createGain(),start=alertAudioCtx.currentTime+delay;
+  osc.type='sine';osc.frequency.value=freq;
+  vol.gain.setValueAtTime(0.0001,start);
+  vol.gain.exponentialRampToValueAtTime(gain,start+0.02);
+  vol.gain.exponentialRampToValueAtTime(0.0001,start+dur);
+  osc.connect(vol);vol.connect(alertAudioCtx.destination);
+  osc.start(start);osc.stop(start+dur+0.04);
+}
+function playAlertSound(kind){
+  if(!soundEnabled||!alertAudioCtx)return;
+  if(alertAudioCtx.state==='suspended')alertAudioCtx.resume();
+  var seq=kind==='critical'?[[880,0,0.18,0.16],[660,0.24,0.18,0.14],[880,0.48,0.28,0.16],[440,0.88,0.35,0.12]]:kind==='incoming'?[[784,0,0.16,0.1],[988,0.22,0.2,0.11]]:[[660,0,0.12,0.06]];
+  seq.forEach(function(t){playTone(t[0],t[1],t[2],t[3]);});
+}
+['pointerdown','keydown'].forEach(function(evt){document.addEventListener(evt,function(){if(!soundEnabled)enableAlertSound();},{once:true});});
+
+var HOSPS={'Manipal Hospital':{lat:12.9591,lon:77.6488},'Apollo Hospital':{lat:12.8996,lon:77.5987},'Fortis Hospital':{lat:12.9947,lon:77.5855},'St. Johns Medical':{lat:12.9347,lon:77.6149},'NIMHANS':{lat:12.9415,lon:77.5954},'Victoria Hospital':{lat:12.9629,lon:77.5698}};
+var SL={ok:'Normal',warn:'Monitor closely',bad:'!! Abnormal'};
+var TC={ok:'vt ok',warn:'vt warn',bad:'vt bad'};
+
+function vStat(k,v){
+  v=parseFloat(v);if(isNaN(v))return null;
+  var R={spo2:[[95,100,'ok'],[90,95,'warn'],[0,90,'bad']],hr:[[60,100,'ok'],[40,120,'warn'],[0,40,'bad'],[121,999,'bad']],rr:[[12,20,'ok'],[8,25,'warn'],[0,8,'bad'],[26,99,'bad']],temp:[[36.5,37.5,'ok'],[35,39,'warn'],[0,35,'bad'],[39,99,'bad']],gcs:[[13,15,'ok'],[8,12,'warn'],[3,7,'bad']]};
+  if(!R[k])return null;
+  for(var i=0;i<R[k].length;i++){var r=R[k][i];if(v>=r[0]&&v<=r[1])return r[2];}return'bad';
+}
+function bpStat(s,d){s=parseFloat(s);d=parseFloat(d);if(isNaN(s)||isNaN(d))return null;if(s>180||s<80||d>120||d<50)return'bad';if(s>130||s<90||d>90||d<60)return'warn';return'ok';}
+function setVt(id,val,st){
+  document.getElementById('v-'+id).textContent=val||'--';
+  var e=document.getElementById('vs-'+id),t=document.getElementById('vt-'+id);
+  if(st){e.textContent=SL[st];e.className='vt-st '+st;t.className=TC[st];}
+  else{e.textContent='';t.className='vt';}
+}
+
+var etaDL=null,origMins=null,dMap=null,dRoute=null,dAmb=null,dHosp=null,lastSent=null;
+function startETA(mins,setAt){
+  origMins=mins;
+  etaDL=new Date((setAt?new Date(setAt):new Date()).getTime()+mins*60000);
+  document.getElementById('eta-orig').textContent='Started: '+mins+' min';
+}
+setInterval(function(){
+  if(!etaDL)return;
+  var diff=Math.max(0,Math.ceil((etaDL-new Date())/60000));
+  var el=document.getElementById('eta-num'),bar=document.getElementById('eta-bar');
+  el.textContent=diff;
+  el.className='eta-num'+(diff<=3?' urgent':diff<=7?' soon':'');
+  var pct=origMins?Math.max(0,((etaDL-new Date())/(origMins*60000))*100):100;
+  bar.style.width=pct+'%';
+  bar.style.background=diff<=3?'var(--red)':diff<=7?'var(--amber)':'var(--green)';
+},1000);
+
+function drawMap(amb,hosp,hospName){
+  if(!dMap){dMap=L.map('doc-map',{zoomControl:true,attributionControl:false});L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(dMap);}
+  fetch('https://router.project-osrm.org/route/v1/driving/'+amb.lon+','+amb.lat+';'+hosp.lon+','+hosp.lat+'?overview=full&geometries=geojson')
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(dRoute)dMap.removeLayer(dRoute);
+      if(data.code==='Ok'&&data.routes.length)
+        dRoute=L.polyline(data.routes[0].geometry.coordinates.map(function(c){return[c[1],c[0]];}),{color:'#E24B4A',weight:4,opacity:0.85}).addTo(dMap);
+      placeMarkers(amb,hosp,hospName);
+    }).catch(function(){placeMarkers(amb,hosp,hospName);});
+}
+function placeMarkers(amb,hosp,hospName){
+  if(dAmb)dMap.removeLayer(dAmb);if(dHosp)dMap.removeLayer(dHosp);
+  dAmb=L.circleMarker([amb.lat,amb.lon],{radius:10,fillColor:'#E24B4A',color:'white',weight:2,fillOpacity:1}).addTo(dMap).bindPopup('<b>Ambulance</b>');
+  dHosp=L.circleMarker([hosp.lat,hosp.lon],{radius:10,fillColor:'#378ADD',color:'white',weight:2,fillOpacity:1}).addTo(dMap).bindPopup('<b>'+hospName+'</b>');
+  dMap.fitBounds(L.latLngBounds([[amb.lat,amb.lon],[hosp.lat,hosp.lon]]),{padding:[30,30]});
+}
+
+function render(d){
+  var p=d.patient,v=d.vitals,l=d.location,n=d.notes;
+  var isNewTransmission=d.sentAt&&d.sentAt!==lastSent;
+  document.getElementById('waiting').style.display='none';
+  document.getElementById('dash').style.display='block';
+  var sev=(d.severity||'stable').toLowerCase();
+  document.getElementById('alert-banner').className='alert-banner '+sev;
+  document.getElementById('sev-badge').className='sev-badge '+sev;
+  document.getElementById('sev-badge').textContent=d.severity||'Unknown';
+  document.getElementById('al-title').textContent=p.name||'Unknown Patient';
+  document.getElementById('al-sub').textContent=(d.unit||'AMB')+' — '+(p.incident||'Unspecified incident');
+  document.getElementById('al-time').textContent='Received '+new Date(d.sentAt).toLocaleTimeString('en-IN',{hour12:false});
+  document.getElementById('amb-dot').className='amb-dot live';
+  document.getElementById('amb-lbl').textContent='Ambulance transmitting';
+  document.getElementById('amb-lbl').style.color='var(--red)';
+  document.getElementById('d-name').textContent=p.name||'-';
+  document.getElementById('d-age').textContent=[(p.age?p.age+' yrs':''),p.gender].filter(Boolean).join(' / ')||'-';
+  document.getElementById('d-blood').textContent=p.blood||'Unknown';
+  document.getElementById('d-incident').textContent=p.incident||'-';
+  var ae=document.getElementById('d-allergy');ae.textContent=p.allergy||'None reported';ae.style.color=p.allergy?'var(--red)':'var(--text2)';
+  document.getElementById('d-unit').textContent=d.unit||'-';
+  if(l.etaMins&&d.sentAt!==lastSent) startETA(l.etaMins,l.etaSetAt||d.sentAt);
+  document.getElementById('eta-dist').textContent=l.distKm?l.distKm+' km away':'-';
+  document.getElementById('eta-loc').textContent=[l.address,l.hospital].filter(Boolean).join(' → ')||'-';
+  ['spo2','hr','rr','temp','gcs'].forEach(function(k){setVt(k,v[k],vStat(k,v[k]));});
+  var bst=bpStat(v.bpSys,v.bpDia);
+  document.getElementById('v-bp').textContent=(v.bpSys&&v.bpDia)?v.bpSys+'/'+v.bpDia:'--/--';
+  var bse=document.getElementById('vs-bp'),bte=document.getElementById('vt-bp');
+  if(bst){bse.textContent=SL[bst];bse.className='vt-st '+bst;bte.className=TC[bst];}
+  var ce=document.getElementById('d-complaint');ce.textContent=n.complaint||'Not provided';ce.className='nbox'+(n.complaint?'':' empty');
+  var ie=document.getElementById('d-interventions');ie.textContent=n.interventions||'Not provided';ie.className='nbox'+(n.interventions?'':' empty');
+  if(l.coords&&l.hospital&&HOSPS[l.hospital]) drawMap(l.coords,HOSPS[l.hospital],l.hospital);
+  if(isNewTransmission)playAlertSound(sev==='critical'?'critical':'incoming');
+  lastSent=d.sentAt;
+  document.getElementById('last-update').textContent='Last update: '+new Date().toLocaleTimeString('en-IN',{hour12:false});
+}
+
+function triggerAlert(){
+  if(!confirm('Send CRITICAL ALERT to nursing station?'))return;
+  var patientName=document.getElementById('d-name').textContent;
+  var note=document.getElementById('doc-notes').value.trim();
+  var payload={sentAt:new Date().toISOString(),status:'Critical',patient:patientName&&patientName!=='-'?patientName:'Current patient',message:note||'Patient marked critical by doctor.'};
+  // Send via socket to nurse
+  socket.emit('doctor_alert', payload);
+  playAlertSound('critical');
+  alert('Critical alert sent to nursing station.');
+}
+function saveNotes(){
+  var notes=document.getElementById('doc-notes').value;
+  socket.emit('save_notes', notes);
+  alert('Notes saved.');
+}
+function markReady(b){b.textContent='Team Ready';b.style.background='var(--green)';setTimeout(function(){b.textContent='\u2713 Mark Team Ready';b.style.background='';},5000);}
+</script>
+</body>
+</html>
